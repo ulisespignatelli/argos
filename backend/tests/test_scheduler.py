@@ -14,7 +14,7 @@ class FakeHub:
 
 
 class Fake(Collector):
-    name, layer, interval, keep_history = "fake", "earthquakes", 1, True
+    name, layer, interval, keep_history = "fake", "c2", 1, True
 
     def __init__(self):
         self.fail = False
@@ -22,19 +22,37 @@ class Fake(Collector):
     async def fetch(self, client):
         if self.fail:
             raise CollectorError("fuente caida")
-        return [Entity(id="fake:1", layer="earthquakes", lat=1, lon=2, label="x", observed_at=utcnow())]
+        return [Entity(id="fake:1", layer="c2", label="x", observed_at=utcnow(), attrs={"ip": "1.1.1.1"})]
 
 
-async def test_success_then_failure_keeps_last_data(tmp_path):
+class Tagger:
+    async def enrich(self, entities):
+        return [e.model_copy(update={"lat": 1.0, "lon": 2.0}) for e in entities]
+
+
+async def test_enrich_store_then_failure_keeps_last_data(tmp_path):
     cache, hub, repo, c = LayerCache(), FakeHub(), HistoryRepository(str(tmp_path / "h.db")), Fake()
-    s = Scheduler([c], cache, hub, repo, client=None)
+    s = Scheduler([c], cache, hub, repo, client=None, enrichers=[Tagger()])
     assert await s.run_once(c)
-    assert cache.get("earthquakes").status.count == 1
+    snap = cache.get("c2")
+    assert snap.status.count == 1 and snap.entities[0].lat == 1.0
     assert hub.sent[-1]["type"] == "snapshot"
-    assert len(await repo.query("earthquakes", since=utcnow().replace(year=2000))) == 1
+    assert len(await repo.query("c2", since=utcnow().replace(year=2000))) == 1
 
     c.fail = True
     assert not await s.run_once(c)
-    snap = cache.get("earthquakes")
-    assert snap.status.error == "fuente caida" and len(snap.entities) == 1   # conserva el ultimo dato bueno
+    snap = cache.get("c2")
+    assert snap.status.error == "fuente caida" and len(snap.entities) == 1
     assert hub.sent[-1]["type"] == "status"
+
+
+def test_history_migrates_v1_schema(tmp_path):
+    import sqlite3
+    path = str(tmp_path / "old.db")
+    db = sqlite3.connect(path)
+    db.execute("CREATE TABLE observations (id TEXT, layer TEXT, observed_at TEXT, lat REAL NOT NULL, lon REAL NOT NULL,"
+               " label TEXT, attrs TEXT, PRIMARY KEY (id, observed_at))")
+    db.commit(); db.close()
+    HistoryRepository(path)
+    cols = {r[1]: r[3] for r in sqlite3.connect(path).execute("PRAGMA table_info(observations)")}
+    assert cols["lat"] == 0   # ya no es NOT NULL

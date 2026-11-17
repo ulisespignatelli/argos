@@ -1,8 +1,7 @@
-import { AircraftLayer } from "./aircraftLayer";
-import { EarthquakeLayer } from "./earthquakeLayer";
+import { C2Layer } from "./c2Layer";
 import type { MapLayer } from "./types";
 
-/** Unico lugar donde se listan las capas. Sumar una capa = crear su clase y agregarla aca. */
+/** Unico lugar donde se listan las capas del mapa. Sumar una capa = crear su clase y agregarla aca. */
 export function createLayers(): MapLayer[] {
-  return [new AircraftLayer(), new EarthquakeLayer()];
+  return [new C2Layer()];
 }

@@ -2,8 +2,8 @@
 export interface Entity {
   id: string;
   layer: string;
-  lat: number;
-  lon: number;
+  lat: number | null; // null: sin ubicacion (p. ej. vulnerabilidades, o IP todavia no geolocalizada)
+  lon: number | null;
   label: string;
   observed_at: string;
   attrs: Record<string, unknown>;
@@ -25,3 +25,7 @@ export interface Snapshot {
 export type ServerMessage =
   | { type: "snapshot"; snapshot: Snapshot }
   | { type: "status"; status: LayerStatus };
+
+/** Lectura segura de atributos: los datos vienen de fuentes externas. */
+export const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));
+export const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);

@@ -8,13 +8,16 @@ export interface State {
   entities: Record<string, Entity[]>;
   visible: Record<string, boolean>;
   search: string;
+  family: string | null; // filtro por familia de malware
 }
 
 type Listener = (s: State, prev: State) => void;
 
 /** Estado global minimo: inmutable, con suscripcion. Las vistas solo leen y piden cambios. */
 export class Store {
-  private state: State = { connection: "connecting", mode: null, statuses: {}, entities: {}, visible: {}, search: "" };
+  private state: State = {
+    connection: "connecting", mode: null, statuses: {}, entities: {}, visible: {}, search: "", family: null,
+  };
   private listeners = new Set<Listener>();
 
   get(): State {
@@ -33,7 +36,6 @@ export class Store {
     return () => this.listeners.delete(l);
   }
 
-  // Acciones
   applySnapshot(status: LayerStatus, entities: Entity[]): void {
     const s = this.state;
     this.set({

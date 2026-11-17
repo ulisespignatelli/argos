@@ -1,4 +1,4 @@
-"""Corre cada recolector en su propio ciclo: consulta, guarda en cache e historial, difunde."""
+"""Corre cada recolector en su propio ciclo: consulta, enriquece, guarda y difunde."""
 import asyncio
 import logging
 
@@ -6,17 +6,19 @@ import httpx
 
 from app.collectors.base import Collector
 from app.services.cache import LayerCache
+from app.services.enrichment import Enricher
 from app.services.hub import Hub
 from app.storage.history import HistoryRepository
 
 log = logging.getLogger(__name__)
-MAX_BACKOFF = 600
+MAX_BACKOFF = 1800
 
 
 class Scheduler:
-    def __init__(self, collectors: list[Collector], cache: LayerCache, hub: Hub,
-                 history: HistoryRepository, client: httpx.AsyncClient):
+    def __init__(self, collectors: list[Collector], cache: LayerCache, hub: Hub, history: HistoryRepository,
+                 client: httpx.AsyncClient | None, enrichers: list[Enricher] | None = None):
         self.collectors, self.cache, self.hub, self.history, self.client = collectors, cache, hub, history, client
+        self.enrichers = enrichers or []
         self._tasks: list[asyncio.Task] = []
         for c in collectors:
             cache.register(c.layer, c.name)
@@ -30,6 +32,8 @@ class Scheduler:
             status = await self.cache.set_error(c.layer, msg)
             await self.hub.broadcast({"type": "status", "status": status.model_dump(mode="json")})
             return False
+        for enricher in self.enrichers:
+            entities = await enricher.enrich(entities)
         snap = await self.cache.replace(c.layer, entities)
         if c.keep_history:
             await self.history.save(entities)
@@ -40,7 +44,7 @@ class Scheduler:
         delay = c.interval
         while True:
             ok = await self.run_once(c)
-            delay = c.interval if ok else min(MAX_BACKOFF, max(delay, c.interval) * 2)
+            delay = c.interval if ok else min(MAX_BACKOFF, max(delay, 30) * 2)
             await asyncio.sleep(delay)
 
     def start(self) -> None:

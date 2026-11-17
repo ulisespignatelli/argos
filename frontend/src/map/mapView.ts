@@ -3,14 +3,14 @@ import { createBaseLayer } from "./tiles";
 
 /** Crea el mapa base. No sabe nada de capas ni de datos. */
 export function createMap(el: HTMLElement): L.Map {
-  const map = L.map(el, { zoomControl: false, worldCopyJump: true, preferCanvas: true }).setView([-33, -62], 4);
+  const map = L.map(el, { zoomControl: false, worldCopyJump: true, preferCanvas: true }).setView([30, 10], 2);
   L.control.zoom({ position: "bottomright" }).addTo(map);
   createBaseLayer().addTo(map);
   return map;
 }
 
 /** Popup armado con textContent: los datos vienen de fuentes externas, nunca se insertan como HTML. */
-export function popup(title: string, rows: [string, string][]): HTMLElement {
+export function popup(title: string, rows: [string, string][], extra?: HTMLElement | null): HTMLElement {
   const root = document.createElement("div");
   const b = document.createElement("b");
   b.textContent = title;
@@ -23,5 +23,6 @@ export function popup(title: string, rows: [string, string][]): HTMLElement {
     dl.append(dt, dd);
   }
   root.append(b, dl);
+  if (extra) root.append(extra);
   return root;
 }

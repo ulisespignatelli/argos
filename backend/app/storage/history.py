@@ -6,13 +6,14 @@ from datetime import datetime, timedelta, timezone
 
 from app.domain.models import Entity
 
+SCHEMA_VERSION = 2
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS observations (
     id TEXT NOT NULL,
     layer TEXT NOT NULL,
     observed_at TEXT NOT NULL,
-    lat REAL NOT NULL,
-    lon REAL NOT NULL,
+    lat REAL,
+    lon REAL,
     label TEXT NOT NULL,
     attrs TEXT NOT NULL,
     PRIMARY KEY (id, observed_at)
@@ -24,6 +25,10 @@ CREATE INDEX IF NOT EXISTS ix_obs_layer_time ON observations (layer, observed_at
 class HistoryRepository:
     def __init__(self, path: str):
         self._db = sqlite3.connect(path, check_same_thread=False)
+        if self._db.execute("PRAGMA user_version").fetchone()[0] < SCHEMA_VERSION:
+            # v1 guardaba aviones y sismos con coordenadas obligatorias: se descarta.
+            self._db.execute("DROP TABLE IF EXISTS observations")
+            self._db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self._db.executescript(SCHEMA)
         self._lock = asyncio.Lock()
 

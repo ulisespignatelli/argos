@@ -1,12 +1,12 @@
 """Modelo comun. Todas las fuentes se normalizan a Entity; el resto del sistema solo conoce esto."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Entity(BaseModel):
@@ -40,4 +40,34 @@ class LayerStatus(BaseModel):
 
 class Snapshot(BaseModel):
     status: LayerStatus
+    entities: list[Entity]
+
+
+class Alert(BaseModel):
+    id: str
+    at: datetime
+    severity: str                 # "alta", "media" o "baja"
+    rule: str
+    title: str
+    detail: str
+    pivot_kind: str | None = None  # para abrir la investigacion desde la alerta
+    pivot_value: str | None = None
+
+
+class PivotItem(BaseModel):
+    value: str
+    count: int
+
+
+class PivotGroup(BaseModel):
+    kind: str
+    label: str
+    items: list[PivotItem]
+
+
+class Pivot(BaseModel):
+    kind: str
+    value: str
+    total: int
+    groups: list[PivotGroup]
     entities: list[Entity]

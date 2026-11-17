@@ -27,7 +27,7 @@ class Hub:
             return
         clients = list(self._clients)
         results = await asyncio.gather(*(c.send_json(message) for c in clients), return_exceptions=True)
-        for client, result in zip(clients, results):
+        for client, result in zip(clients, results, strict=True):
             if isinstance(result, Exception):
                 log.info("cliente desconectado: %s", result)
                 self.disconnect(client)

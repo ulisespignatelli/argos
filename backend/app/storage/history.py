@@ -2,7 +2,7 @@
 import asyncio
 import json
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.domain.models import Entity
 
@@ -52,7 +52,7 @@ class HistoryRepository:
                        label=r[5], attrs=json.loads(r[6])) for r in rows]
 
     async def prune(self, days: int) -> int:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
         async with self._lock:
             def run():
                 with self._db:

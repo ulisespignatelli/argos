@@ -52,7 +52,8 @@ def test_history_migrates_v1_schema(tmp_path):
     db = sqlite3.connect(path)
     db.execute("CREATE TABLE observations (id TEXT, layer TEXT, observed_at TEXT, lat REAL NOT NULL, lon REAL NOT NULL,"
                " label TEXT, attrs TEXT, PRIMARY KEY (id, observed_at))")
-    db.commit(); db.close()
+    db.commit()
+    db.close()
     HistoryRepository(path)
     cols = {r[1]: r[3] for r in sqlite3.connect(path).execute("PRAGMA table_info(observations)")}
     assert cols["lat"] == 0   # ya no es NOT NULL

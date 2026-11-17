@@ -1,24 +1,35 @@
 """Corre cada recolector en su propio ciclo: consulta, enriquece, guarda y difunde."""
 import asyncio
 import logging
+from typing import Protocol
 
 import httpx
 
 from app.collectors.base import Collector
+from app.domain.models import Entity
 from app.services.cache import LayerCache
 from app.services.enrichment import Enricher
 from app.services.hub import Hub
 from app.storage.history import HistoryRepository
 
 log = logging.getLogger(__name__)
+
+
+class SnapshotListener(Protocol):
+    async def on_snapshot(self, layer: str, previous: list[Entity] | None, current: list[Entity]) -> object: ...
+
+
 MAX_BACKOFF = 1800
 
 
 class Scheduler:
     def __init__(self, collectors: list[Collector], cache: LayerCache, hub: Hub, history: HistoryRepository,
-                 client: httpx.AsyncClient | None, enrichers: list[Enricher] | None = None):
+                 client: httpx.AsyncClient | None, enrichers: list[Enricher] | None = None,
+                 listeners: list[SnapshotListener] | None = None):
         self.collectors, self.cache, self.hub, self.history, self.client = collectors, cache, hub, history, client
         self.enrichers = enrichers or []
+        self.listeners = listeners or []
+        self._loaded: set[str] = set()   # capas que ya recibieron al menos un dato bueno
         self._tasks: list[asyncio.Task] = []
         for c in collectors:
             cache.register(c.layer, c.name)
@@ -34,10 +45,18 @@ class Scheduler:
             return False
         for enricher in self.enrichers:
             entities = await enricher.enrich(entities)
+        before = self.cache.get(c.layer)
+        previous = before.entities if before and c.layer in self._loaded else None
         snap = await self.cache.replace(c.layer, entities)
+        self._loaded.add(c.layer)
         if c.keep_history:
             await self.history.save(entities)
         await self.hub.broadcast({"type": "snapshot", "snapshot": snap.model_dump(mode="json")})
+        for listener in self.listeners:
+            try:
+                await listener.on_snapshot(c.layer, previous, entities)
+            except Exception:   # una regla rota no debe frenar la recoleccion
+                log.exception("listener %s fallo", type(listener).__name__)
         return True
 
     async def _loop(self, c: Collector) -> None:

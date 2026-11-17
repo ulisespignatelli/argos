@@ -1,7 +1,7 @@
 """Cache persistente de geolocalizaciones: cada IP se consulta una sola vez cada `ttl_days`."""
 import asyncio
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.domain.models import GeoInfo
 
@@ -24,22 +24,24 @@ class GeoCache:
     async def get_many(self, ips: set[str]) -> dict[str, GeoInfo]:
         if not ips:
             return {}
-        cutoff = (datetime.now(timezone.utc) - self.ttl).isoformat()
+        cutoff = (datetime.now(UTC) - self.ttl).isoformat()
         ips_list = list(ips)
         async with self._lock:
             def run():
                 rows = []
                 for i in range(0, len(ips_list), 500):   # limite de parametros de SQLite
                     part = ips_list[i:i + 500]
+                    # Solo se interpolan marcadores '?'; los valores van como parametros.
+                    marks = ','.join('?' * len(part))
                     rows += self._db.execute(
-                        f"SELECT data FROM geoip WHERE updated_at>=? AND ip IN ({','.join('?' * len(part))})",
+                        f"SELECT data FROM geoip WHERE updated_at>=? AND ip IN ({marks})",  # noqa: S608
                         (cutoff, *part)).fetchall()
                 return rows
             rows = await asyncio.to_thread(run)
         return {g.ip: g for g in (GeoInfo.model_validate_json(r[0]) for r in rows)}
 
     async def put_many(self, infos: dict[str, GeoInfo]) -> None:
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         rows = [(ip, g.model_dump_json(), now) for ip, g in infos.items()]
         async with self._lock:
             def run():

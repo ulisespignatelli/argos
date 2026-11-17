@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.collectors import cisa_kev, threatfox
+from app.collectors import cisa_kev, threatfox, urlhaus
 from app.collectors.base import CollectorError
 from app.collectors.demo import DemoC2, DemoKev
 
@@ -46,7 +46,7 @@ async def test_threatfox_sends_key_and_keeps_only_ip_port():
 
 
 async def test_threatfox_without_key_or_rejected():
-    with pytest.raises(CollectorError, match="ARGOS_THREATFOX_KEY"):
+    with pytest.raises(CollectorError, match="ARGOS_ABUSECH_KEY"):
         await threatfox.ThreatFoxC2("").fetch(None)
     async with mock_client(lambda r: httpx.Response(401)) as c:
         with pytest.raises(CollectorError, match="rechazo"):
@@ -63,10 +63,35 @@ async def test_kev_parse_sorted_and_flags_ransomware():
     assert all(e.lat is None for e in items)
 
 
+URLHAUS_SAMPLE = {"query_status": "ok", "urls": [
+    {"id": "3001", "url": "http://45.9.148.10/bins/x86", "host": "45.9.148.10", "url_status": "online",
+     "date_added": "2026-11-17 09:00:00 UTC", "threat": "malware_download", "tags": ["elf", "mozi"],
+     "reporter": "r1", "urlhaus_reference": "https://urlhaus.abuse.ch/url/3001/"},
+    {"id": "3002", "url": "https://bad.example.com/a.exe", "host": "bad.example.com", "url_status": "offline",
+     "date_added": "2026-11-17 08:00:00 UTC", "threat": "malware_download", "tags": None},
+    {"id": "3003", "url": None, "host": "x"},
+]}
+
+
+async def test_urlhaus_ip_hosts_get_ip_attr():
+    async with mock_client(lambda r: httpx.Response(200, json=URLHAUS_SAMPLE)
+                           if r.headers.get("Auth-Key") == "k" else httpx.Response(401)) as c:
+        items = await urlhaus.UrlhausUrls("k").fetch(c)
+        with pytest.raises(CollectorError, match="rechazo"):
+            await urlhaus.UrlhausUrls("otra").fetch(c)
+    assert [e.id for e in items] == ["urlhaus:3001", "urlhaus:3002"]
+    assert items[0].attrs["ip"] == "45.9.148.10" and "ip" not in items[1].attrs
+    assert items[1].attrs["tags"] == []
+
+
 async def test_demo_uses_only_documentation_ips():
     import ipaddress
-    c2 = await DemoC2().fetch(None)
-    assert len(c2) == 160
+    gen = DemoC2()
+    c2 = await gen.fetch(None)
+    assert len(c2) == DemoC2.BASE
+    for _ in range(10):
+        c2 = await gen.fetch(None)
+    assert len(c2) == 160 and any(e.attrs["malware"] == "Pikabot" for e in c2)
     docs = [ipaddress.ip_network(n) for n in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24")]
     assert all(any(ipaddress.ip_address(e.attrs["ip"]) in n for n in docs) for e in c2)
     assert all(e.attrs["cve"].startswith("DEMO-") for e in await DemoKev().fetch(None))

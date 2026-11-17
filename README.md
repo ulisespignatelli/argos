@@ -1,64 +1,58 @@
 # ARGOS
 
 Plataforma de inteligencia de amenazas con fuentes abiertas. Ubica en un mapa mundial, en tiempo
-real, los servidores de comando y control (C2) que usan las familias de malware activas, y sigue
-las vulnerabilidades que se están explotando en ataques reales.
+real, la infraestructura de los atacantes (servidores de comando y control y URLs que distribuyen
+malware), la correlaciona para descubrir conexiones, genera alertas y exporta los indicadores en
+formatos estándar.
 
 ![Vista general en modo demo](docs/vista-general.png)
 
-## Qué muestra
+## Qué hace
+
+**Fuentes en vivo**
 
 | Capa | Fuente | Qué es |
 |---|---|---|
-| Servidores C2 | [ThreatFox](https://threatfox.abuse.ch) (abuse.ch) | IPs y puertos desde los que se controla malware (Cobalt Strike, AsyncRAT, Remcos, etc.), geolocalizados y coloreados por familia |
-| Vulnerabilidades explotadas | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | CVE que CISA confirma como explotados, marcando los usados en campañas de ransomware |
+| Servidores C2 | [ThreatFox](https://threatfox.abuse.ch) | IPs desde las que se controla malware (Cobalt Strike, AsyncRAT, Remcos…), geolocalizadas y coloreadas por familia |
+| URLs de malware | [URLhaus](https://urlhaus.abuse.ch) | Enlaces que distribuyen malware; los alojados en una IP aparecen en el mapa |
+| Vulnerabilidades explotadas | [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) | CVE confirmados en ataques reales, marcando los usados por ransomware |
 
-En el panel se puede filtrar por familia de malware, buscar por IP, país o ASN, y abrir el detalle
-de cada indicador. Las IPs se muestran desactivadas (`45[.]9[.]148[.]10`), como es costumbre al
-compartir indicadores, para que no se abran por error.
+**Investigación por correlación.** Desde cualquier IP, red (ASN), país, host o familia de malware se
+abre una investigación que muestra todo lo conectado en un grafo navegable: qué familias usan esa
+IP, qué otras IPs maliciosas hay en la misma red, qué URLs de malware aloja. Cada nodo es un nuevo
+punto de partida, y el recorrido queda en migas para volver atrás.
 
-![Filtro por familia y detalle de un indicador](docs/filtro-y-detalle.png)
+![Investigación de una IP](docs/investigacion.png)
+
+**Alertas automáticas** cuando aparece una familia de malware nunca vista, un servidor C2 en un
+país vigilado, un crecimiento brusco de una familia o una vulnerabilidad explotada nueva (con
+severidad alta si la usa el ransomware).
+
+**Exportación** de los indicadores en CSV, como lista de bloqueo para un firewall, o en
+[STIX 2.1](https://oasis-open.github.io/cti-documentation/), el estándar para compartir
+inteligencia de amenazas entre herramientas. Se puede exportar todo o solo una familia o un país.
 
 ## Arquitectura
 
-```
-fuentes ──► recolectores ──► enriquecimiento (GeoIP + caché) ──► caché ──► WebSocket ──► navegador
-                                                                   │                       ▲
-                                                                   └──► historial ─────────┘ REST
-```
+Backend en Python (FastAPI) y frontend en TypeScript (Vite + Leaflet), comunicados por REST y
+WebSocket. El detalle de cada pieza y las decisiones de diseño están en
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### Backend (`backend/`, Python + FastAPI)
+## Seguridad
 
-| Carpeta | Responsabilidad |
-|---|---|
-| `app/collectors/` | Un módulo por fuente (ThreatFox, CISA KEV, demo). Todos implementan `Collector.fetch()` y devuelven `Entity`. |
-| `app/geolocation/` | Puerto `Geolocator` con adaptadores intercambiables (ip-api, demo). |
-| `app/services/` | Planificador por fuente con espera creciente ante errores, enriquecimiento, caché en memoria y difusión por WebSocket. |
-| `app/storage/` | Historial y caché de geolocalización en SQLite, detrás de interfaces chicas. |
-| `app/api/` | REST y WebSocket. Solo leen datos ya procesados: nunca consultan fuentes. |
-| `app/domain/` | Modelo común (`Entity`, `GeoInfo`, `Snapshot`): el contrato con el frontend. |
-| `app/core/` | Configuración por variables de entorno o `backend/.env`. |
+El modelo de amenazas completo está en [SECURITY.md](SECURITY.md). En resumen:
 
-### Frontend (`frontend/`, Vite + TypeScript + Leaflet)
+- Las claves viven solo en `backend/.env`; el navegador nunca las ve, y gitleaks las busca en CI.
+- Todo dato externo se valida al entrar y se muestra como texto, nunca como HTML.
+- Los indicadores se muestran desactivados (`1[.]2[.]3[.]4`) y el CSV neutraliza fórmulas de Excel.
+- La API es de solo lectura, con límite de consultas por cliente y cabeceras de seguridad.
+- El modo demo usa IPs y dominios reservados para documentación: nunca acusa a una IP real.
 
-| Carpeta | Responsabilidad |
-|---|---|
-| `src/api/` | Tipos del contrato y cliente REST/WebSocket con reconexión automática. |
-| `src/state/` | Estado global inmutable con suscripción (flujo de datos en una sola dirección). |
-| `src/layers/` | Una clase por capa del mapa con la interfaz `MapLayer`, registradas en `registry.ts`. |
-| `src/map/` | Mapa base configurable, sin lógica de datos. |
-| `src/ui/` | Panel: estadísticas, fuentes, familias de malware y vulnerabilidades. |
+## Calidad
 
-## Decisiones de seguridad
-
-- **Las claves viven solo en el backend** (`backend/.env`, fuera de Git). El navegador nunca las ve.
-- **Todo dato externo se trata como no confiable:** se valida con Pydantic al entrar y se muestra con
-  `textContent`, nunca como HTML. Los enlaces solo se aceptan si son `http(s)`.
-- **Indicadores desactivados** en la interfaz para evitar clics accidentales.
-- **API de solo lectura** (CORS limitado a `GET` y al origen del frontend).
-- **El modo demo no acusa a nadie:** usa IPs reservadas para documentación (RFC 5737) y CVE ficticios.
-- **Geolocalización mínima:** solo se envían a ip-api IPs públicas que ya son indicadores públicos, y
-  cada una se consulta una única vez gracias a la caché.
+Cada cambio pasa por [GitHub Actions](.github/workflows/ci.yml): linter con reglas de seguridad
+(Ruff con Bandit), tests, chequeo de tipos, auditoría de dependencias de Python y de npm, y
+búsqueda de claves filtradas. Dependabot propone actualizaciones de dependencias cada semana.
 
 ## Cómo correrlo
 
@@ -71,7 +65,7 @@ python -m venv .venv
 .venv/Scripts/activate        # Windows (PowerShell: .venv\Scripts\Activate.ps1)
 # source .venv/bin/activate   # Linux o Mac
 pip install -e ".[dev]"
-cp .env.example .env          # y completá ARGOS_THREATFOX_KEY
+cp .env.example .env          # y completá ARGOS_ABUSECH_KEY
 python -m uvicorn app.main:app --reload
 
 # frontend (otra terminal)
@@ -82,14 +76,14 @@ npm run dev                   # http://localhost:5173
 
 Para probarlo sin clave ni red, poné `ARGOS_MODE=demo` en `backend/.env`.
 
-La clave de ThreatFox es gratuita: se genera en <https://auth.abuse.ch> entrando con una cuenta de
+La clave de abuse.ch (sirve para ThreatFox y URLhaus) es gratuita: se genera en <https://auth.abuse.ch> entrando con una cuenta de
 GitHub, Google o similar.
 
 ### Con Docker
 
 ```bash
-cp backend/.env.example .env
-docker compose up --build     # http://localhost:8080
+cp backend/.env.example backend/.env    # y completá la clave
+docker compose up --build               # http://localhost:8080
 ```
 
 ## Endpoints
@@ -98,23 +92,28 @@ docker compose up --build     # http://localhost:8080
 |---|---|---|
 | GET | `/api/health` | estado y modo (`live` o `demo`) |
 | GET | `/api/layers` | estado de cada fuente |
-| GET | `/api/layers/{capa}` | entidades actuales (`c2` o `kev`) |
+| GET | `/api/layers/{capa}` | entidades actuales (`c2`, `urls` o `kev`) |
+| GET | `/api/pivot?kind=ip&value=…` | correlación de una IP, `asn`, `country`, `malware` o `host` |
+| GET | `/api/alerts` | alertas recientes |
+| GET | `/api/export/c2.csv` · `blocklist.txt` · `stix.json` | indicadores exportados (filtros `malware` y `country`) |
 | GET | `/api/history/{capa}?hours=24` | observaciones guardadas (hasta 90 días) |
-| WS | `/ws` | estado completo al conectar y cada actualización después |
+| WS | `/ws` | estado completo y alertas al conectar; cada cambio después |
 
 Documentación interactiva en `http://localhost:8000/docs`.
 
 ## Tests
 
 ```bash
-cd backend && pytest
+cd backend
+pytest          # tests (sin red: las fuentes se simulan)
+ruff check .    # linter con reglas de seguridad
+pip-audit .     # vulnerabilidades en dependencias
 ```
-
-No usan red: las respuestas de ThreatFox, CISA e ip-api se simulan.
 
 ## Próximos pasos
 
 - Auditor de exposición de dominios con autorización verificada por DNS, integrado como capa
+- Víctimas de ransomware publicadas por los grupos, por país y sector
 - Caídas de internet por país (IODA o Cloudflare Radar)
-- Alertas cuando aparece una familia nueva o un C2 en un país o ASN elegido
-- Exportar indicadores en formato STIX o como lista de bloqueo
+- Línea de tiempo para reproducir la evolución de una campaña sobre el historial
+- Enriquecimiento con certificados TLS y DNS pasivo para descubrir infraestructura relacionada

@@ -22,9 +22,34 @@ export interface Snapshot {
   entities: Entity[];
 }
 
+export type Severity = "alta" | "media" | "baja";
+
+export interface Alert {
+  id: string;
+  at: string;
+  severity: Severity;
+  rule: string;
+  title: string;
+  detail: string;
+  pivot_kind: PivotKind | null;
+  pivot_value: string | null;
+}
+
+export type PivotKind = "ip" | "asn" | "country" | "malware" | "host";
+
+export interface Pivot {
+  kind: PivotKind;
+  value: string;
+  total: number;
+  groups: { kind: PivotKind; label: string; items: { value: string; count: number }[] }[];
+  entities: Entity[];
+}
+
 export type ServerMessage =
   | { type: "snapshot"; snapshot: Snapshot }
-  | { type: "status"; status: LayerStatus };
+  | { type: "status"; status: LayerStatus }
+  | { type: "alert"; alert: Alert }
+  | { type: "alerts"; alerts: Alert[] };
 
 /** Lectura segura de atributos: los datos vienen de fuentes externas. */
 export const str = (v: unknown): string => (typeof v === "string" ? v : v == null ? "" : String(v));

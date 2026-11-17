@@ -3,7 +3,7 @@ import { createBaseLayer } from "./tiles";
 
 /** Crea el mapa base. No sabe nada de capas ni de datos. */
 export function createMap(el: HTMLElement): L.Map {
-  const map = L.map(el, { zoomControl: false, worldCopyJump: true, preferCanvas: true }).setView([30, 10], 2);
+  const map = L.map(el, { zoomControl: false, worldCopyJump: true, preferCanvas: true, minZoom: 2 }).setView([30, 10], 2);
   L.control.zoom({ position: "bottomright" }).addTo(map);
   createBaseLayer().addTo(map);
   return map;

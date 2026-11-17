@@ -1,5 +1,12 @@
 import type L from "leaflet";
-import type { Entity } from "../api/types";
+import type { Entity, PivotKind } from "../api/types";
+
+export interface LayerFilter {
+  query: string;
+  focusIds: Set<string> | null; // investigacion activa: se resaltan estas entidades y se atenuan las demas
+}
+
+export type Investigate = (kind: PivotKind, value: string) => void;
 
 /** Contrato de toda capa del mapa. El mapa no sabe que capas existen: solo las monta. */
 export interface MapLayer {
@@ -9,6 +16,6 @@ export interface MapLayer {
   mount(map: L.Map): void;
   setVisible(on: boolean): void;
   update(entities: Entity[]): void;
-  setFilter(filter: { query: string; family: string | null }): Entity | null; // devuelve la primera coincidencia
+  setFilter(filter: LayerFilter): Entity | null; // devuelve la primera coincidencia de la busqueda
   focus(entity: Entity): void;
 }

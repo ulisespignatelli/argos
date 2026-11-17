@@ -1,4 +1,4 @@
-import type { Entity, LayerStatus, ServerMessage } from "./types";
+import type { Entity, LayerStatus, Pivot, PivotKind, ServerMessage } from "./types";
 
 export async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -10,6 +10,12 @@ export const api = {
   health: () => getJSON<{ status: string; mode: string }>("/api/health"),
   layers: () => getJSON<LayerStatus[]>("/api/layers"),
   history: (layer: string, hours = 24) => getJSON<Entity[]>(`/api/history/${layer}?hours=${hours}`),
+  pivot: (kind: PivotKind, value: string) =>
+    getJSON<Pivot>(`/api/pivot?${new URLSearchParams({ kind, value })}`),
+  exportUrl: (format: "c2.csv" | "blocklist.txt" | "stix.json", filter: { malware?: string; country?: string } = {}) => {
+    const q = new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][]).toString();
+    return `/api/export/${format}${q ? `?${q}` : ""}`;
+  },
 };
 
 export type ConnectionState = "connecting" | "open" | "closed";

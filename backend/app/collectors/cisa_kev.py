@@ -1,5 +1,5 @@
 """Vulnerabilidades que CISA confirma como explotadas en ataques reales (catalogo KEV, publico)."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -29,7 +29,7 @@ def parse(data: dict, latest: int = 60) -> list[Entity]:
         if not cve or not added:
             continue
         try:
-            when = datetime.strptime(added, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            when = datetime.strptime(added, "%Y-%m-%d").replace(tzinfo=UTC)
         except ValueError:
             continue
         out.append(Entity(

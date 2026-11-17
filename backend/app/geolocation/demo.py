@@ -26,7 +26,9 @@ class DemoGeolocator(Geolocator):
         out = {}
         for ip in ips:
             h = int(hashlib.sha256(ip.encode()).hexdigest(), 16)
-            city, country, cc, lat, lon = CITIES[h % len(CITIES)]
+            local = ip.startswith("203.0.113.") and int(ip.rsplit(".", 1)[1]) >= 200   # ver collectors/demo.py
+            # El ultimo lugar de CITIES se reserva para las IPs "locales" de la demo.
+            city, country, cc, lat, lon = CITIES[-1] if local else CITIES[h % (len(CITIES) - 1)]
             jitter_lat, jitter_lon = ((h >> 8) % 100 - 50) / 60, ((h >> 16) % 100 - 50) / 60
             out[ip] = GeoInfo(ip=ip, lat=lat + jitter_lat, lon=lon + jitter_lon, country=country, country_code=cc,
                               city=city, asn=f"AS{64512 + h % 1000}", org=ORGS[(h >> 24) % len(ORGS)])

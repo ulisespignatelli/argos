@@ -27,13 +27,18 @@ class Settings:
     db_path: str = field(default_factory=lambda: _env("ARGOS_DB", "argos.db"))
     cors_origins: tuple[str, ...] = field(default_factory=lambda: tuple(
         o for o in _env("ARGOS_CORS", "http://localhost:5173").split(",") if o))
-    # ThreatFox (abuse.ch): clave gratuita en https://auth.abuse.ch
-    threatfox_key: str = field(default_factory=lambda: _env("ARGOS_THREATFOX_KEY", ""))
+    # abuse.ch (ThreatFox y URLhaus): una sola clave gratuita, en https://auth.abuse.ch
+    abusech_key: str = field(default_factory=lambda: _env("ARGOS_ABUSECH_KEY", "") or _env("ARGOS_THREATFOX_KEY", ""))
     threatfox_days: int = field(default_factory=lambda: int(_env("ARGOS_THREATFOX_DAYS", "3")))
     threatfox_interval: float = field(default_factory=lambda: float(_env("ARGOS_THREATFOX_INTERVAL", "900")))
+    urlhaus_interval: float = field(default_factory=lambda: float(_env("ARGOS_URLHAUS_INTERVAL", "900")))
     kev_interval: float = field(default_factory=lambda: float(_env("ARGOS_KEV_INTERVAL", "21600")))
     # Geolocalizacion de IPs: "ip-api" (gratis, sin clave, uso no comercial) o "none".
     geoip: str = field(default_factory=lambda: _env("ARGOS_GEOIP", "ip-api"))
+    # Paises a vigilar (ISO-3166 alfa-2): alerta cuando aparece un C2 nuevo alli.
+    watch_countries: tuple[str, ...] = field(default_factory=lambda: tuple(
+        c.strip().upper() for c in _env("ARGOS_WATCH_COUNTRIES", "AR").split(",") if c.strip()))
+    rate_limit_per_minute: int = field(default_factory=lambda: int(_env("ARGOS_RATE_LIMIT", "240")))
     history_days: int = field(default_factory=lambda: int(_env("ARGOS_HISTORY_DAYS", "30")))
 
     def __post_init__(self):

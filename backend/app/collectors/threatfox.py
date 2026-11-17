@@ -1,5 +1,5 @@
 """Servidores de comando y control (C2) activos, de ThreatFox (abuse.ch). Requiere clave gratuita."""
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 
@@ -17,10 +17,10 @@ class ThreatFoxC2(Collector):
 
     async def fetch(self, client: httpx.AsyncClient) -> list[Entity]:
         if not self.key:
-            raise CollectorError("falta ARGOS_THREATFOX_KEY (clave gratuita en auth.abuse.ch)")
+            raise CollectorError("falta ARGOS_ABUSECH_KEY (clave gratuita en auth.abuse.ch)")
         resp = await client.post(URL, json={"query": "get_iocs", "days": self.days}, headers={"Auth-Key": self.key})
         if resp.status_code in (401, 403):
-            raise CollectorError("ThreatFox rechazo la clave (revisar ARGOS_THREATFOX_KEY)")
+            raise CollectorError("ThreatFox rechazo la clave (revisar ARGOS_ABUSECH_KEY)")
         if resp.status_code != 200:
             raise CollectorError(f"ThreatFox respondio HTTP {resp.status_code}")
         data = resp.json()
@@ -36,7 +36,7 @@ def _ts(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=timezone.utc)
+        return datetime.strptime(value, "%Y-%m-%d %H:%M:%S UTC").replace(tzinfo=UTC)
     except ValueError:
         return None
 
@@ -54,7 +54,7 @@ def parse(items: list[dict]) -> list[Entity]:
         malware = it.get("malware_printable") or it.get("malware") or "desconocido"
         out.append(Entity(
             id=f"threatfox:{it['id']}", layer="c2", label=f"{malware} · {ip}",
-            observed_at=_ts(it.get("last_seen")) or first or datetime.now(timezone.utc),
+            observed_at=_ts(it.get("last_seen")) or first or datetime.now(UTC),
             attrs={"ip": ip, "port": int(port) if port.isdigit() else None, "malware": malware,
                    "malware_id": it.get("malware"), "threat_type": it.get("threat_type_desc") or it.get("threat_type"),
                    "confidence": it.get("confidence_level"), "first_seen": first.isoformat() if first else None,

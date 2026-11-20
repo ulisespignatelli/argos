@@ -67,6 +67,17 @@ def test_classification(ex, title, kind):
     assert ex.extract(item(title)).primary == kind
 
 
+def test_same_cve_merges_even_weeks_apart(ex, kb):
+    items = [item("Use-after-free CVE-2099-0505 in Vendor A product", "CERT", 24 * 9, official=True),
+             item("CVE-2099-0505 also affects Vendor B gateway", "CERT", 1, official=True)]
+    events = build_events(ex, kb, items, frozenset(), now=NOW)
+    assert len(events) == 1 and len(events[0].attrs["sources"]) == 2
+
+
+def test_cryptomining_is_not_crypto_theft(ex):
+    assert ex.extract(item("Hackers exploit flaw to deploy cryptomining malware")).primary != "cripto"
+
+
 def test_not_events(ex):
     for t in ("How to choose a password manager", "Spark Capital raises new fund", "Snake game is back on Play"):
         assert ex.extract(item(t)).primary is None
@@ -95,6 +106,13 @@ def test_cluster_and_status(ex, kb):
     # Un CVE del catalogo KEV verifica aunque haya una sola fuente.
     one = build_events(ex, kb, items[1:2], frozenset({"CVE-2099-0101"}), now=NOW)[0]
     assert one.attrs["status"] == "verificado" and one.attrs["cves"][0]["kev"]
+
+
+def test_vulnerability_advisories_are_not_placed(ex, kb):
+    items = [item("Critical vulnerability CVE-2099-0303 in German vendor's PLC, Germany", "CERT", 2, official=True),
+             item("Patch now: CVE-2099-0404 flaw in Canada-based software", "Medio", 1)]
+    for e in build_events(ex, kb, items, frozenset(), now=NOW):
+        assert e.lat is None and e.attrs["global"]
 
 
 def test_event_id_is_stable(ex, kb):

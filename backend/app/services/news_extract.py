@@ -48,7 +48,7 @@ KEYWORDS: dict[str, re.Pattern] = {
                     r"seiz(?:ed|ure|es)\b", r"law enforcement", r"europol\b", r"interpol\b", r"indict",
                     r"pleads? guilty", r"charged\b", r"detenid", r"arrestad", r"desarticul", r"incautad", r"extraditad",
                     r"condenad", r"operaci[oó]n policial"),
-    "cripto_base": _rx(r"crypto", r"bitcoin", r"ethereum", r"defi\b", r"blockchain", r"web3\b", r"cripto"),
+    "cripto_base": _rx(r"crypto(?!min|jack)", r"bitcoin", r"ethereum", r"defi\b", r"blockchain", r"web3\b", r"cripto"),
     "cripto_robo": _rx(r"stolen", r"steal", r"theft", r"heist", r"drain", r"hack", r"exploit", r"robo\b",
                        r"robad", r"sustra"),
     "ransomware": _rx(r"ransomware", r"ransom\b", r"extortion", r"double extortion", r"leak site", r"extorsi[oó]n",
@@ -314,7 +314,7 @@ class Extractor:
         types: dict[str, str] = {}
         # Las palabras del titulo pesan mas: un resumen puede mencionar de pasada otros temas.
         for key in ("policial", "ransomware", "ddos", "ot", "estado_nacion", "fuga", "malware", "caida"):
-            w = hit(key, title) or (hit(key, body) if key in ("ransomware", "estado_nacion", "ot") else None)
+            w = hit(key, title) or (hit(key, body) if key in ("ransomware", "estado_nacion") else None)
             if w:
                 types[key] = f"palabra: {w}"
         if hit("cripto_base", title) and hit("cripto_robo", text):
@@ -377,9 +377,9 @@ def cluster(items: list[Extracted], days: float = 4) -> list[list[Extracted]]:
     for i, a in enumerate(items):
         for j in range(i):
             b = items[j]
-            if abs((a.item.published - b.item.published).total_seconds()) > days * 86400:
+            same_cve = bool(set(a.cves) & set(b.cves))   # el mismo CVE es el mismo tema, sin limite de dias
+            if not same_cve and abs((a.item.published - b.item.published).total_seconds()) > days * 86400:
                 continue
-            same_cve = bool(set(a.cves) & set(b.cves))
             same_actor = bool(set(a.actors + a.software) & set(b.actors + b.software)) and a.primary == b.primary
             if same_cve or same_actor or _similar(a.item.title, b.item.title):
                 union(i, j)

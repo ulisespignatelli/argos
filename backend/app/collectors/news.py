@@ -162,7 +162,10 @@ def to_entity(group: list[Extracted], kb: KnowledgeBase, kev_ids: frozenset[str]
     verdict, why = status(group, kev_ids)
     first = min(x.item.published for x in group)
     lat = lon = None
-    if victims and (c := kb.country(victims[0])):
+    # Un aviso de vulnerabilidad nombra el pais del fabricante, no el de una victima: no se ubica en el mapa
+    # (lo mismo que con el catalogo KEV). Tampoco los avisos oficiales de producto.
+    locate = kind != "vulnerabilidad" and not all(x.item.official for x in group)
+    if locate and victims and (c := kb.country(victims[0])):
         r = random.Random(event_id(group))  # noqa: S311 (dispersion visual)
         lat, lon = round(c["lat"] + r.uniform(-1.5, 1.5), 4), round(c["lon"] + r.uniform(-1.8, 1.8), 4)
     origin = None

@@ -305,6 +305,6 @@ body.heat-on .leaflet-overlay-pane svg, body.heat-on .leaflet-overlay-pane canva
 .hl-tag.one { color: #ffa502; border-color: #6b4a12; }
 .lg-ring { width: 10px; height: 10px; border-radius: 50%; border: 2px solid #4fd1c5; background: #0b1218; }
 .lg-ring.dashed { border-style: dashed; }
-.ev-tip { background: #0b121a; color: #fff; border: 1px solid var(--line); font: 11px ui-monospace, monospace; max-width: 320px; white-space: normal; }
+.ev-tip { background: #0b121a; color: #fff; border: 1px solid var(--line); font: 11px ui-monospace, monospace; width: max-content; max-width: 320px; white-space: normal; }
 .tabs button { white-space: nowrap; padding: 7px 2px; }
 .cat { padding: 2px 4px; font-size: 11.5px; }

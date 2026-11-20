@@ -5,7 +5,7 @@ requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn>=0.30",
-    "websockets>=13",   # WebSocket para uvicorn (sin los extras [standard], que traen PyYAML)
+    "websockets>=17.4",   # WebSocket para uvicorn (sin los extras [standard], que traen PyYAML)
     "watchfiles>=0.20", # para --reload
     "httpx>=0.27",
     "defusedxml>=0.7",  # lectura segura de RSS/Atom (sin entidades externas ni bombas XML)

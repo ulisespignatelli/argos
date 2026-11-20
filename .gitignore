@@ -5,3 +5,6 @@ __pycache__/
 *.db
 .env
 .venv/
+*.egg-info/
+.ruff_cache/
+*.db-journal

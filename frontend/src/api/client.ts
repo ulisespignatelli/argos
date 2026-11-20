@@ -1,4 +1,4 @@
-import type { Entity, LayerStatus, Pivot, PivotKind, ServerMessage } from "./types";
+import type { ActorProfile, ActorSummary, Entity, LayerStatus, MatrixData, Pivot, PivotKind, ServerMessage } from "./types";
 
 export async function getJSON<T>(path: string): Promise<T> {
   const res = await fetch(path);
@@ -9,9 +9,13 @@ export async function getJSON<T>(path: string): Promise<T> {
 export const api = {
   health: () => getJSON<{ status: string; mode: string }>("/api/health"),
   layers: () => getJSON<LayerStatus[]>("/api/layers"),
-  history: (layer: string, hours = 24) => getJSON<Entity[]>(`/api/history/${layer}?hours=${hours}`),
+  history: (layer: string, hours = 24) => getJSON<Entity[]>(`/api/history/${layer}?hours=${hours}&limit=10000`),
   pivot: (kind: PivotKind, value: string) =>
     getJSON<Pivot>(`/api/pivot?${new URLSearchParams({ kind, value })}`),
+  actors: (activeOnly = false) => getJSON<ActorSummary[]>(`/api/actors?active_only=${activeOnly}`),
+  actor: (id: string) => getJSON<ActorProfile>(`/api/actors/${encodeURIComponent(id)}`),
+  matrix: (scope: string) => getJSON<MatrixData>(`/api/attack/matrix?scope=${encodeURIComponent(scope)}`),
+  reportUrl: "/api/report/weekly.md",
   exportUrl: (format: "c2.csv" | "blocklist.txt" | "stix.json", filter: { malware?: string; country?: string } = {}) => {
     const q = new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][]).toString();
     return `/api/export/${format}${q ? `?${q}` : ""}`;

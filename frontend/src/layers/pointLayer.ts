@@ -19,6 +19,11 @@ export abstract class PointLayer implements MapLayer {
   protected abstract searchText(e: Entity): string;
   protected abstract popupFor(e: Entity): HTMLElement;
 
+  /** Que pasa al hacer clic en un punto: por defecto, una ficha emergente. */
+  protected bindMarker(entry: { marker: L.CircleMarker; entity: Entity }): void {
+    entry.marker.bindPopup(() => this.popupFor(entry.entity), { maxWidth: 340 });
+  }
+
   mount(map: L.Map): void {
     this.map = map;
     this.group.addTo(map);
@@ -56,7 +61,7 @@ export abstract class PointLayer implements MapLayer {
         existing.marker.setLatLng([e.lat, e.lon]).setStyle(this.style(e));
       } else {
         const entry = { marker: L.circleMarker([e.lat, e.lon], this.style(e)), entity: e };
-        entry.marker.bindPopup(() => this.popupFor(entry.entity), { maxWidth: 340 });
+        this.bindMarker(entry);
         entry.marker.addTo(this.group);
         this.markers.set(e.id, entry);
       }
@@ -87,7 +92,7 @@ export abstract class PointLayer implements MapLayer {
     const entry = this.markers.get(entity.id);
     if (!entry) return;
     this.map.flyTo(entry.marker.getLatLng(), Math.max(this.map.getZoom(), 5), { duration: 0.8 });
-    entry.marker.openPopup();
+    if (entry.marker.getPopup()) entry.marker.openPopup();
   }
 }
 

@@ -35,7 +35,8 @@ export function createToaster(root: HTMLElement, store: Store): (a: Alert) => vo
         t.classList.add("click");
         t.title = "Investigar";
         t.addEventListener("click", () => {
-          store.investigate(a.pivot_kind!, a.pivot_value!, true);
+          if (a.pivot_kind === "event") store.selectEvent(a.pivot_value!);
+          else store.investigate(a.pivot_kind!, a.pivot_value!, true);
           t.remove();
         });
       }

@@ -5,6 +5,14 @@ import { defang, familyColor, safeLink, shortDate } from "../util/format";
 import { actions, PointLayer } from "./pointLayer";
 import type { Investigate } from "./types";
 
+/** Actores de MITRE ATT&CK que usan la familia de este indicador. */
+export function actorsText(e: Entity): string {
+  const names = (e.attrs.actor_names as string[] | undefined) ?? [];
+  const total = typeof e.attrs.actors_total === "number" ? e.attrs.actors_total : names.length;
+  if (!names.length) return "Sin vínculo en MITRE ATT&CK";
+  return names.slice(0, 3).join(", ") + (total > 3 ? ` y ${total - 3} más` : "") + " (usan esta familia)";
+}
+
 /** Servidores de comando y control: un punto por indicador, coloreado por familia de malware. */
 export class C2Layer extends PointLayer {
   readonly id = "c2";
@@ -43,6 +51,7 @@ export class C2Layer extends PointLayer {
       ["Primera vez", first ? shortDate(first) : "—"],
       ["Reportó", str(a.reporter) || "—"],
       ["Etiquetas", tags || "—"],
+      ["Actores", actorsText(e)],
     ], actions(buttons, safeLink(str(a.source_url), "ThreatFox ↗")));
   }
 }

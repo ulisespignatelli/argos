@@ -20,7 +20,7 @@ class ThreatFoxC2(Collector):
             raise CollectorError("falta ARGOS_ABUSECH_KEY (clave gratuita en auth.abuse.ch)")
         resp = await client.post(URL, json={"query": "get_iocs", "days": self.days}, headers={"Auth-Key": self.key})
         if resp.status_code in (401, 403):
-            raise CollectorError("ThreatFox rechazo la clave (revisar ARGOS_ABUSECH_KEY)")
+            raise CollectorError(f"ThreatFox rechazo la clave (HTTP {resp.status_code}): revisar ARGOS_ABUSECH_KEY")
         if resp.status_code != 200:
             raise CollectorError(f"ThreatFox respondio HTTP {resp.status_code}")
         data = resp.json()

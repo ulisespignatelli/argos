@@ -57,6 +57,7 @@ class Alert(BaseModel):
 class PivotItem(BaseModel):
     value: str
     count: int
+    label: str | None = None   # nombre legible (p. ej. "Lazarus Group" para G0032)
 
 
 class PivotGroup(BaseModel):

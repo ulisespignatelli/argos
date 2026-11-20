@@ -4,7 +4,13 @@ import type { ConnectionState } from "../api/client";
 export interface Investigation {
   kind: PivotKind;
   value: string;
+  label?: string; // nombre legible (p. ej. "Lazarus Group" para G0032)
 }
+
+export type Region = "world" | "latam";
+export type TimeWindow = "7d" | "30d" | "90d" | "1y" | "all";
+export type Overlay = "actors" | "matrix" | null;
+export type HeatMode = "off" | "hex" | "country";
 
 export interface State {
   connection: ConnectionState;
@@ -17,6 +23,14 @@ export interface State {
   trail: Investigation[]; // recorrido de la investigacion; el ultimo es el actual
   pivot: Pivot | null;
   pivotError: string | null;
+  region: Region;
+  overlay: Overlay;
+  matrixScope: string;
+  timeWindow: TimeWindow;
+  history: { incidents?: Entity[]; kev?: Entity[]; events?: Entity[] };
+  heat: HeatMode;
+  sector: string | null;
+  selected: Entity | null; // ficha de incidente abierta
 }
 
 type Listener = (s: State, prev: State) => void;
@@ -25,7 +39,8 @@ type Listener = (s: State, prev: State) => void;
 export class Store {
   private state: State = {
     connection: "connecting", mode: null, statuses: {}, entities: {}, visible: {}, search: "",
-    alerts: [], trail: [], pivot: null, pivotError: null,
+    alerts: [], trail: [], pivot: null, pivotError: null, region: "world", overlay: null, matrixScope: "active",
+    timeWindow: "30d", history: {}, sector: null, selected: null, heat: "off",
   };
   private listeners = new Set<Listener>();
 
@@ -69,10 +84,15 @@ export class Store {
   }
 
   /** Abre una investigacion. `fresh` reinicia el recorrido; si no, se agrega como un paso mas. */
-  investigate(kind: PivotKind, value: string, fresh = false): void {
+  investigate(kind: PivotKind, value: string, fresh = false, label?: string): void {
     const cur = this.state.trail.at(-1);
     if (!fresh && cur && cur.kind === kind && cur.value === value) return;
-    this.set({ trail: fresh ? [{ kind, value }] : [...this.state.trail, { kind, value }].slice(-12), pivotError: null });
+    const step = { kind, value, label };
+    this.set({ trail: fresh ? [step] : [...this.state.trail, step].slice(-12), pivotError: null, overlay: null, selected: null });
+  }
+
+  openMatrix(scope = "active"): void {
+    this.set({ overlay: "matrix", matrixScope: scope });
   }
 
   back(steps = 1): void {
@@ -80,7 +100,19 @@ export class Store {
   }
 
   closeInvestigation(): void {
-    this.set({ trail: [], pivot: null, pivotError: null });
+    this.set({ trail: [], pivot: null, pivotError: null, selected: null });
+  }
+
+  /** Abre la ficha de un evento por su ID (desde una alerta), buscando en lo actual y en el historial. */
+  selectEvent(id: string): boolean {
+    const s = this.state;
+    const e = [...(s.entities.events ?? []), ...(s.history.events ?? [])].find((x) => x.id === id);
+    if (e) this.select(e);
+    return !!e;
+  }
+
+  select(e: Entity | null): void {
+    this.set({ selected: e, trail: [], pivot: null, pivotError: null });
   }
 }
 

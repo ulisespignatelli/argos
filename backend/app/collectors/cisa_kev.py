@@ -12,14 +12,18 @@ URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabil
 class CisaKev(Collector):
     name, layer, keep_history = "cisa", "kev", True
 
-    def __init__(self, interval: float = 21600, latest: int = 60):
-        self.interval, self.latest = interval, latest
+    def __init__(self, interval: float = 21600, latest: int = 60, index=None):
+        # index (opcional): KevIndex compartido con el recolector de noticias, para verificar CVE.
+        self.interval, self.latest, self.index = interval, latest, index
 
     async def fetch(self, client: httpx.AsyncClient) -> list[Entity]:
         resp = await client.get(URL)
         if resp.status_code != 200:
             raise CollectorError(f"CISA respondio HTTP {resp.status_code}")
-        return parse(resp.json(), self.latest)
+        data = resp.json()
+        if self.index is not None:
+            self.index.ids = frozenset(str(v.get("cveID", "")).upper() for v in data.get("vulnerabilities", []))
+        return parse(data, self.latest)
 
 
 def parse(data: dict, latest: int = 60) -> list[Entity]:

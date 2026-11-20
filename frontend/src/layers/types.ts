@@ -6,7 +6,7 @@ export interface LayerFilter {
   focusIds: Set<string> | null; // investigacion activa: se resaltan estas entidades y se atenuan las demas
 }
 
-export type Investigate = (kind: PivotKind, value: string) => void;
+export type Investigate = (kind: PivotKind, value: string, fresh?: boolean, label?: string) => void;
 
 /** Contrato de toda capa del mapa. El mapa no sabe que capas existen: solo las monta. */
 export interface MapLayer {

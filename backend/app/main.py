@@ -14,7 +14,9 @@ from app.core.logging import setup_logging
 from app.geolocation.base import Geolocator
 from app.geolocation.demo import DemoGeolocator
 from app.geolocation.ipapi import IpApiGeolocator
+from app.knowledge.kb import KnowledgeBase
 from app.services.alerts import AlertEngine
+from app.services.attack_enrichment import AttackEnricher
 from app.services.cache import LayerCache
 from app.services.enrichment import GeoIpEnricher
 from app.services.hub import Hub
@@ -40,6 +42,7 @@ def create_app(settings: Settings | None = None, collectors: list[Collector] | N
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.settings = settings
+        app.state.kb = KnowledgeBase()
         app.state.cache = LayerCache()
         app.state.hub = Hub()
         app.state.history = HistoryRepository(settings.db_path)
@@ -49,8 +52,9 @@ def create_app(settings: Settings | None = None, collectors: list[Collector] | N
         await app.state.history.prune(settings.history_days)
         async with httpx.AsyncClient(timeout=30, headers={"User-Agent": "argos-osint/0.2"}) as client:
             geolocator = build_geolocator(settings, client)
-            enrichers = [GeoIpEnricher(geolocator, geo_cache)] if geolocator else []
-            app.state.scheduler = Scheduler(collectors if collectors is not None else build_collectors(settings),
+            enrichers = ([GeoIpEnricher(geolocator, geo_cache)] if geolocator else []) + [AttackEnricher(app.state.kb)]
+            chosen = collectors if collectors is not None else build_collectors(settings, app.state.kb)
+            app.state.scheduler = Scheduler(chosen,
                                             app.state.cache, app.state.hub, app.state.history, client, enrichers,
                                             listeners=[engine])
             if start_scheduler:
@@ -61,9 +65,10 @@ def create_app(settings: Settings | None = None, collectors: list[Collector] | N
         app.state.alerts.close()
         app.state.history.close()
 
-    app = FastAPI(title="ARGOS API", version="0.3.0", lifespan=lifespan,
+    app = FastAPI(title="ARGOS API", version="0.4.0", lifespan=lifespan,
                   description="Inteligencia de amenazas con fuentes abiertas: infraestructura C2, URLs de malware, "
-                              "vulnerabilidades explotadas, correlacion, alertas y exportacion STIX 2.1.")
+                              "vulnerabilidades explotadas, ataques de ransomware, actores y matriz MITRE ATT&CK, "
+                              "correlacion, alertas y exportacion STIX 2.1.")
     app.add_middleware(SecurityMiddleware, per_minute=settings.rate_limit_per_minute)
     app.add_middleware(CORSMiddleware, allow_origins=list(settings.cors_origins), allow_methods=["GET"],
                        allow_headers=["*"])

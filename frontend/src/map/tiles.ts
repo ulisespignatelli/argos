@@ -27,7 +27,7 @@ const PROVIDERS: Record<string, { url: string; options: L.TileLayerOptions; dark
 export function createBaseLayer(): L.TileLayer {
   const name = import.meta.env.VITE_MAP_TILES ?? "osm-dark";
   const p = PROVIDERS[name] ?? PROVIDERS["osm-dark"];
-    // OpenStreetMap exige saber desde qué sitio se piden los mapas (cabecera Referer): sin ella, bloquea.
+  // OpenStreetMap exige saber desde que sitio se piden los mapas (cabecera Referer): sin ella, bloquea.
   return L.tileLayer(p.url, {
     minZoom: 2, ...p.options, className: p.dark ? "tiles-dark" : "", referrerPolicy: "strict-origin-when-cross-origin",
   });

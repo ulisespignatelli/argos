@@ -20,7 +20,7 @@ def test_pivot_ip_includes_neighbors_and_groups():
     p = correlation.pivot(ents, "ip", "1.1.1.1")
     assert p.total == 2
     groups = {g.label: [i.value for i in g.items] for g in p.groups}
-    assert set(groups["Familias de malware"]) == {"Sliver", "Havoc"}
+    assert set(groups["Familias y grupos de ransomware"]) == {"Sliver", "Havoc"}
     assert groups["IPs vecinas en la misma red"] == ["2.2.2.2"]
     assert correlation.pivot(ents, "malware", "sliver").total == 2   # sin distinguir mayusculas
 

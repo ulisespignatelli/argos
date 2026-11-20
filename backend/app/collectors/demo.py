@@ -130,3 +130,88 @@ class DemoKev(Collector):
                              "ransomware": rw, "cwes": [], "source_url": None})
                for cve, vendor, product, kind, age, rw in self.items[:visible]]
         return sorted(out, key=lambda e: e.observed_at, reverse=True)
+
+
+DEMO_GROUPS = [("akira", 14), ("qilin", 12), ("lockbit3", 9), ("play", 8), ("ransomhub", 7), ("medusa", 5),
+               ("blackbasta", 4), ("safepay", 6), ("dragonforce", 4), ("Wizard Spider", 4)]
+DEMO_VICTIMS = ["Logística", "Agroindustrias", "Clínica", "Constructora", "Distribuidora", "Municipalidad",
+                "Transportes", "Laboratorios", "Metalúrgica", "Cooperativa", "Estudio Jurídico", "Hotelera",
+                "Textil", "Software"]
+DEMO_SECTORS = ["Salud", "Manufactura", "Gobierno", "Transporte", "Educación", "Finanzas", "Comercio", "Tecnología"]
+DEMO_COUNTRIES = [("AR", 8), ("BR", 10), ("MX", 8), ("CL", 5), ("CO", 5), ("PE", 3), ("UY", 2), ("US", 14), ("ES", 6),
+                  ("DE", 5), ("IT", 5), ("FR", 4), ("GB", 4), ("CA", 3), ("AU", 2), ("IN", 2)]
+
+
+class DemoIncidents(Collector):
+    """Victimas ficticias ("... Demo SA") reivindicadas por grupos reales, con fuerte presencia de Latinoamerica."""
+    name, layer, keep_history = "demo", "incidents", True
+    BASE, STEP = 70, 3
+
+    def __init__(self, countries: dict, interval: float = 25, count: int = 85, seed: int = 9):
+        from app.collectors.ransomware_live import place
+        self.interval, self.cycle, self.countries, self._place = interval, 0, countries, place
+        r = random.Random(seed)
+        g, gw = zip(*DEMO_GROUPS, strict=True)
+        c, cw = zip(*DEMO_COUNTRIES, strict=True)
+        self.items = []
+        for i in range(count):
+            late = i >= self.BASE
+            cc = "AR" if late and i % 3 == 0 else r.choices(c, cw)[0]   # algunas victimas argentinas aparecen en vivo
+            self.items.append((i, f"{r.choice(DEMO_VICTIMS)} Demo {chr(65 + i % 26)}{i} SA", r.choices(g, gw)[0], cc,
+                               r.choice(DEMO_SECTORS), r.uniform(0, 600) if late else r.uniform(0, 7 * 86400)))
+
+    async def fetch(self, client: httpx.AsyncClient) -> list[Entity]:
+        visible = min(len(self.items), self.BASE + self.STEP * self.cycle)
+        self.cycle += 1
+        now = datetime.now(UTC)
+        out = []
+        for i, victim, group, cc, sector, age in self.items[:visible]:
+            lat, lon = self._place(cc, f"demo-{i}", self.countries)
+            out.append(Entity(id=f"demo:inc-{i}", layer="incidents", lat=lat, lon=lon, label=victim,
+                              observed_at=now - timedelta(seconds=age),
+                              attrs={"kind": "ransomware", "victim": victim, "group": group, "claim": True,
+                                     "sector": sector, "country_code": cc,
+                                     "country": self.countries.get(cc, {}).get("name"),
+                                     "website": None, "attack_date": None, "source_url": None}))
+        return out
+
+
+# Noticias ficticias: medios inventados (.example), CVE del año 2099 y empresas "Demo". Pasan por el mismo
+# extractor que las reales, asi la demo ejercita la clasificacion, la agrupacion y la verificacion.
+DEMO_NEWS = [
+    ("Boletín Oficial Demo", True, "[DEMO] CISA-like advisory: CVE-2099-0101 in Demo Gateway actively exploited", 2),
+    ("Prensa Demo", False, "[DEMO] Hackers exploit CVE-2099-0101 zero-day in Demo Gateway appliances", 1.5),
+    ("Diario Seguro Demo", False, "[DEMO] Akira ransomware gang claims attack on Logística Demo SA in Chile", 6),
+    ("Prensa Demo", False, "[DEMO] Akira ransomware hits Chilean logistics firm Logística Demo SA", 5),
+    ("Prensa Demo", False, "[DEMO] North Korean hackers linked to crypto heist at fictional DemoExchange", 30),
+    ("Boletín Oficial Demo", True, "[DEMO] Europol: police arrest 4 in takedown of demo botnet in Spain", 20),
+    ("Diario Seguro Demo", False, "[DEMO] DDoS attack disrupts government portals in Argentina", 9),
+    ("Prensa Demo", False, "[DEMO] Data breach at Retail Demo SA exposes customer records in Mexico", 40),
+    ("Boletín SCI Demo", True, "[DEMO] Vulnerabilities in Demo PLC firmware affect industrial control systems", 50),
+    ("Diario Seguro Demo", False, "[DEMO] Russian state-sponsored group Sandworm Team targets energy grid in Ukraine",
+     70),
+    ("Prensa Demo", False, "[DEMO] New Lumma Stealer campaign spreads through fake updates in Brazil", 80),
+    ("Diario Seguro Demo", False, "[DEMO] Qilin ransomware claims hospital attack in Colombia", 0.4),
+    ("Boletín Oficial Demo", True, "[DEMO] Critical vulnerability CVE-2099-0202 in Demo Mail Server", 0.2),
+]
+
+
+class DemoNews(Collector):
+    name, layer, keep_history = "demo", "events", True
+    BASE, STEP = 11, 1
+
+    def __init__(self, kb, interval: float = 30):
+        from app.services.news_extract import Extractor
+        self.kb, self.interval, self.cycle = kb, interval, 0
+        self.extractor = Extractor(kb)
+
+    async def fetch(self, client: httpx.AsyncClient) -> list[Entity]:
+        from app.collectors.news import build_events
+        from app.services.news_extract import NewsItem
+        visible = min(len(DEMO_NEWS), self.BASE + self.STEP * self.cycle)
+        self.cycle += 1
+        now = datetime.now(UTC)
+        items = [NewsItem(title=t, url=f"https://news{i}.example/nota-{i}", published=now - timedelta(hours=h),
+                          source=src, official=off, default_type="ot" if "SCI" in src else None)
+                 for i, (src, off, t, h) in enumerate(DEMO_NEWS[:visible])]
+        return build_events(self.extractor, self.kb, items, frozenset({"CVE-2099-0101"}), now=now)

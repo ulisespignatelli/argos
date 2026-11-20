@@ -43,10 +43,11 @@ class HistoryRepository:
             self._db.executemany("INSERT OR IGNORE INTO observations VALUES (?,?,?,?,?,?,?)", rows)
 
     async def query(self, layer: str, since: datetime, limit: int = 5000) -> list[Entity]:
+        """Ultima observacion de cada entidad de la capa desde `since`, de la mas nueva a la mas vieja."""
         async with self._lock:
             rows = await asyncio.to_thread(lambda: self._db.execute(
-                "SELECT id, layer, observed_at, lat, lon, label, attrs FROM observations"
-                " WHERE layer=? AND observed_at>=? ORDER BY observed_at DESC LIMIT ?",
+                "SELECT id, layer, MAX(observed_at), lat, lon, label, attrs FROM observations"
+                " WHERE layer=? AND observed_at>=? GROUP BY id ORDER BY MAX(observed_at) DESC LIMIT ?",
                 (layer, since.isoformat(), limit)).fetchall())
         return [Entity(id=r[0], layer=r[1], observed_at=datetime.fromisoformat(r[2]), lat=r[3], lon=r[4],
                        label=r[5], attrs=json.loads(r[6])) for r in rows]

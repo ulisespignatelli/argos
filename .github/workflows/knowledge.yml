@@ -1,0 +1,38 @@
+name: Actualizar base de conocimiento
+
+# Regenera el indice de MITRE ATT&CK y MISP una vez por mes y propone el cambio en un pull request.
+on:
+  schedule:
+    - cron: "17 6 3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: python -m app.knowledge.build
+      - run: pytest -q
+      - name: Proponer cambios
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet; then echo "Sin cambios"; exit 0; fi
+          BRANCH="knowledge/$(date +%Y-%m)"
+          git config user.name "argos-bot"
+          git config user.email "argos-bot@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git commit -am "chore(knowledge): actualizar MITRE ATT&CK y MISP"
+          git push -u origin "$BRANCH"
+          gh pr create --title "Actualizar base de conocimiento" --body "Índice regenerado automáticamente desde MITRE ATT&CK y MISP Galaxy."

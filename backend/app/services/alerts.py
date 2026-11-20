@@ -5,6 +5,8 @@ Reglas:
 - C2 nuevo en un pais vigilado (ARGOS_WATCH_COUNTRIES)
 - vulnerabilidad explotada nueva, con severidad alta si se usa en ransomware
 - crecimiento brusco de los C2 de una familia
+- victima de ransomware reivindicada en un pais vigilado
+- evento (noticias/avisos) nuevo en un pais vigilado, o vulnerabilidad explotada confirmada
 """
 import hashlib
 import logging
@@ -34,6 +36,10 @@ class AlertEngine:
                 alerts += self._surges(previous, current)
         elif layer == "kev" and previous is not None:
             alerts += self._new_kev(previous, current)
+        elif layer == "incidents" and previous is not None:
+            alerts += self._watched_victims(previous, current)
+        elif layer == "events" and previous is not None:
+            alerts += self._events(previous, current)
 
         fresh = []
         for a in alerts:
@@ -72,6 +78,18 @@ class AlertEngine:
                                  pivot_kind="ip", pivot_value=ip))
         return out
 
+    def _watched_victims(self, previous: list[Entity], current: list[Entity]) -> list[Alert]:
+        if not self.watch:
+            return []
+        before = {e.id for e in previous}
+        return [Alert(id=_id("victim", e.id), at=utcnow(), severity="alta", rule="victima_pais_vigilado",
+                      title=f"Ransomware en {e.attrs.get('country') or e.attrs.get('country_code')}: "
+                            f"{e.attrs.get('victim')}",
+                      detail=f"Reivindicado por {e.attrs.get('group')} (sin confirmar)"
+                             + (f" · sector {e.attrs['sector']}" if e.attrs.get("sector") else ""),
+                      pivot_kind="malware", pivot_value=str(e.attrs.get("group")))
+                for e in current if e.id not in before and e.attrs.get("country_code") in self.watch]
+
     def _surges(self, previous: list[Entity], current: list[Entity]) -> list[Alert]:
         before = Counter(str(e.attrs.get("malware")) for e in previous)
         now = Counter(str(e.attrs.get("malware")) for e in current)
@@ -94,4 +112,25 @@ class AlertEngine:
             out.append(Alert(id=_id("kev", e.id), at=utcnow(), severity="alta" if rw else "media", rule="kev_nueva",
                              title=f"Explotada: {e.attrs.get('cve')}" + (" (ransomware)" if rw else ""),
                              detail=str(e.attrs.get("name") or e.label)))
+        return out
+
+    def _events(self, previous: list[Entity], current: list[Entity]) -> list[Alert]:
+        before = {e.id for e in previous}
+        out = []
+        for e in current:
+            if e.id in before:
+                continue
+            a = e.attrs
+            verified = a.get("status") == "verificado"
+            label = "verificado" if verified else "1 fuente"
+            places = {c["code"] for c in a.get("countries") or []}
+            if places & self.watch:
+                names = ", ".join(c["name"] for c in a["countries"] if c["code"] in self.watch)
+                out.append(Alert(id=_id("event_watch", e.id), at=utcnow(), severity="alta" if verified else "media",
+                                 rule="evento_pais_vigilado", title=f"{a.get('kind_label')} en {names}",
+                                 detail=f"{a.get('title')} ({label})", pivot_kind="event", pivot_value=e.id))
+            elif verified and a.get("exploited") and a.get("cves"):
+                out.append(Alert(id=_id("event_exploit", e.id), at=utcnow(), severity="alta", rule="evento_explotado",
+                                 title=f"Explotación confirmada: {a['cves'][0]['id']}",
+                                 detail=str(a.get("title")), pivot_kind="event", pivot_value=e.id))
         return out

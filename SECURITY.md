@@ -21,7 +21,12 @@ consideradas y cómo se mitigan:
 | Clickjacking y XSS | La interfaz embebida en otro sitio | CSP, `X-Frame-Options: DENY` y `frame-ancestors 'none'` |
 | Dependencias vulnerables | Una librería con una CVE | `pip-audit` y `npm audit` en CI, Dependabot semanal |
 | Escalada en el contenedor | Un fallo que permite ejecutar código | Usuario sin privilegios, sistema de archivos de solo lectura, `no-new-privileges` |
-| Falsas acusaciones en la demo | Mostrar una IP real como maliciosa | El modo demo usa solo rangos de documentación (RFC 5737) y dominios `.example` (RFC 2606) |
+| Atribución errónea | Mostrar a un país como origen de un ataque sin fuente | Solo se muestra el país que MISP asigna al propio grupo; si no hay, se indica "sin atribución" |
+| Amplificar extorsiones | Repetir como hecho lo que publica un grupo de ransomware | Se rotula como reivindicación sin confirmar y no se reproduce la descripción del sitio de filtración |
+| XML malicioso en un feed | Entidades externas o "billion laughs" en un RSS | Los feeds se leen con `defusedxml`, que rechaza entidades y DTD peligrosas |
+| Noticias falsas o mal clasificadas | Un titular inventado o una clasificación errónea presentada como hecho | Estado visible (verificado o 1 fuente), motivo de cada clasificación a la vista, CVE contrastados con KEV y con el registro público de CVE |
+| Republicar contenido ajeno | Copiar artículos completos | Solo se guarda título, enlace, fecha y medio; el resumen se usa para extraer datos y se descarta |
+| Falsas acusaciones en la demo | Mostrar una IP real como maliciosa | El modo demo usa solo rangos de documentación (RFC 5737), dominios `.example` (RFC 2606) y víctimas ficticias ("… Demo SA") |
 
 ## Privacidad
 

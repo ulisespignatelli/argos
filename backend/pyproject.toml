@@ -3,7 +3,7 @@ name = "argos-backend"
 version = "0.3.0"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.115",
+    "fastapi>=0.165.0",
     "uvicorn>=0.30",
     "websockets>=13",   # WebSocket para uvicorn (sin los extras [standard], que traen PyYAML)
     "watchfiles>=0.20", # para --reload
